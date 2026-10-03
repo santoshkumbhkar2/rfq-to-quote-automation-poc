@@ -12,10 +12,6 @@ Roadmap
 
 
 
-Yes. For tonight, **don't write a huge README**. Your README should explain the business problem and what the POC is proving.
-
-Use this as your **Version 1 README**. You can paste it directly into `README.md`.
-
 # AI RFQ & Quote Automation
 
 A B2B procurement automation platform designed to reduce the manual effort involved in processing **Requests for Quotation (RFQs), product pricing, quotation generation, and approval workflows**.
