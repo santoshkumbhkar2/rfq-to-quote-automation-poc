@@ -1,0 +1,44 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: rfq-to-quote-automation
+
+  # Database configuration (In-Memory H2 Database)
+  datasource:
+    url: jdbc:h2:mem:rfqdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  # JPA & Hibernate configuration
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Web console for inspecting the in-memory H2 database directly in browser
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+# Springdoc OpenAPI / Swagger UI configuration
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+  api-docs:
+    path: /v3/api-docs
+
+# Logging levels
+logging:
+  level:
+    com.santosh.rfq: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
