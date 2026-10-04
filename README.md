@@ -1,595 +1,191 @@
-# rfq-to-quote-automation-poc
+# 🚀 RFQ to Quote Automation Service (Spring Boot Reference)
 
-Problem
-Target Customer
-Current Pain
-Proposed Solution
-Architecture
-Business Workflow
-Business Rules
-API
-Roadmap
-
-
-
-Yes. For tonight, **don't write a huge README**. Your README should explain the business problem and what the POC is proving.
-
-Use this as your **Version 1 README**. You can paste it directly into `README.md`.
-
-# AI RFQ & Quote Automation
-
-A B2B procurement automation platform designed to reduce the manual effort involved in processing **Requests for Quotation (RFQs), product pricing, quotation generation, and approval workflows**.
-
-The initial version focuses on building a reliable backend foundation. AI and workflow automation will be introduced in later phases.
+A production-grade, cleanly architected **Spring Boot 3.3.x + Java 17+** reference project demonstrating how to build robust enterprise microservices using standard design patterns.
 
 ---
 
-## 1. Problem
+## 🧭 The 5 Golden Rules of Spring Boot
 
-Many businesses receive RFQs through email, PDF, Excel files, or other channels.
+When working with modern Spring Boot (especially when reviewing or supervising AI-generated code), keep these 5 laws in mind:
 
-A typical process looks like:
+1. **Inversion of Control (IoC) & Dependency Injection (DI)**:
+   - Never write `new MyService()` or `new MyRepository()`.
+   - Let the Spring ApplicationContext instantiate and wire beans.
+   - Always use **Constructor Injection** (or `@RequiredArgsConstructor`), never `@Autowired` on private fields.
 
-```text
-Customer sends RFQ
-        ↓
-Sales/Procurement team reads RFQ
-        ↓
-Products and quantities are identified
-        ↓
-Prices are searched manually
-        ↓
-Quotation is prepared
-        ↓
-Quotation is reviewed
-        ↓
-Quotation is sent to customer
-```
+2. **Strict Layer Separation**:
+   ```
+   Controller Layer  (@RestController)   -> Handles HTTP, validates input, returns ResponseEntity
+          │
+          ▼
+   Service Layer     (@Service)           -> Executes business logic, defines @Transactional boundaries
+          │
+          ▼
+   Repository Layer  (@Repository)        -> Spring Data JPA queries, interacts with DB
+          │
+          ▼
+   Database Layer    (H2 / PostgreSQL)    -> Persistent relational storage
+   ```
+   - Controller talks **only** to Service.
+   - Service coordinates logic and calls Repository.
+   - **Entities NEVER leave the Service layer to the Controller**: Always accept Request DTOs and return Response DTOs.
 
-This process can become slow and error-prone when companies handle a large number of RFQs.
+3. **Stateless Singletons**:
+   - Spring beans (`@Service`, `@RestController`) are singletons shared across all threads/requests.
+   - Never keep mutable instance fields in a service or controller class.
 
-Common problems include:
+4. **Fail-Fast Input Validation**:
+   - Use Jakarta Bean Validation (`@NotNull`, `@NotBlank`, `@Email`, `@Positive`, etc.) on DTO records.
+   - Annotate Controller request bodies with `@Valid` so bad requests fail immediately before hitting any business logic.
 
-* Manual data entry
-* Searching product prices manually
-* Repeated quotation preparation
-* Pricing errors
-* Lack of workflow visibility
-* Difficulty tracking quotation history
-* Slow response to customers
+5. **Centralized Error Handling**:
+   - Never let raw database errors or stack traces reach API clients.
+   - Use `@RestControllerAdvice` to translate all exceptions into predictable, uniform JSON error responses.
 
 ---
 
-## 2. Proposed Solution
+## 📂 Project Directory Structure
 
-Build a backend platform that manages the complete RFQ-to-Quote workflow.
-
-The initial system will support:
-
-```text
-RFQ
- ↓
-RFQ Items
- ↓
-Product Catalog
- ↓
-Price List
- ↓
-Pricing Rules
- ↓
-Quote Generation
- ↓
-Quote Items
- ↓
-Workflow Events
 ```
-
-Future versions will support:
-
-```text
-Email / PDF / Excel RFQ
-        ↓
-AI Extraction
-        ↓
-Structured RFQ
-        ↓
-Product Matching
-        ↓
-Price Selection
-        ↓
-Quote Generation
-        ↓
-Approval Workflow
-        ↓
-Email / ERP / API
+rfq-to-quote-automation-poc/
+├── pom.xml                                  # Maven dependencies, plugins, and Java 17 configuration
+├── README.md                                # This reference manual
+└── src/
+    ├── main/
+    │   ├── java/com/santosh/rfq/
+    │   │   ├── RfqApplication.java          # Main Spring Boot entry point (@SpringBootApplication)
+    │   │   │
+    │   │   ├── controller/                  # REST API Layer
+    │   │   │   └── QuoteController.java     # Endpoints: POST, GET, PATCH, DELETE /api/v1/quotes
+    │   │   │
+    │   │   ├── service/                     # Business Logic Layer
+    │   │   │   ├── QuoteService.java        # Interface defining business contract
+    │   │   │   └── impl/
+    │   │   │       └── QuoteServiceImpl.java# Implementation with @Transactional & DTO mapping
+    │   │   │
+    │   │   ├── repository/                  # Data Access Layer
+    │   │   │   └── QuoteRequestRepository.java # JpaRepository with derived & JPQL queries
+    │   │   │
+    │   │   ├── entity/                      # Database Schema / ORM Models
+    │   │   │   ├── QuoteRequest.java        # JPA Entity (@Entity, @Table)
+    │   │   │   └── QuoteStatus.java         # Lifecycle Enum (PENDING, APPROVED, etc.)
+    │   │   │
+    │   │   ├── dto/                         # Data Transfer Objects (External API Contracts)
+    │   │   │   ├── request/
+    │   │   │   │   └── CreateQuoteRequest.java # Record with @NotBlank, @Min, @Email
+    │   │   │   └── response/
+    │   │   │       ├── QuoteResponse.java   # Record returning formatted quote + calculated costs
+    │   │   │       └── ErrorResponse.java   # Standardized error payload structure
+    │   │   │
+    │   │   ├── exception/                   # Error Handling
+    │   │   │   ├── ResourceNotFoundException.java # Domain 404 Exception
+    │   │   │   └── GlobalExceptionHandler.java    # @RestControllerAdvice for uniform errors
+    │   │   │
+    │   │   └── config/                      # Spring Configuration
+    │   │       └── OpenApiConfig.java       # Swagger / OpenAPI 3.0 documentation bean
+    │   │
+    │   └── resources/
+    │       └── application.yml              # Config: Port 8080, H2 In-Memory DB, JPA, Swagger
+    │
+    └── test/java/com/santosh/rfq/
+        ├── service/
+        │   └── QuoteServiceTest.java        # Fast unit test using Mockito (no Tomcat startup)
+        └── controller/
+            └── QuoteControllerTest.java     # Web slice test using @WebMvcTest and MockMvc
 ```
 
 ---
 
-## 3. Target Customers
+## 🏃 How to Run the Application
 
-The initial target customers are B2B companies that regularly receive and process RFQs.
+### Option A: Using Maven CLI
+Ensure you have Java 17+ installed. From this directory run:
 
-Potential segments include:
+```bash
+# 1. Run automated tests
+mvn clean test
 
-* Distributors
-* Wholesalers
-* Manufacturing companies
-* Industrial suppliers
-* IT hardware/software resellers
-* Electrical equipment suppliers
-* Procurement teams
-* B2B trading companies
+# 2. Run the application
+mvn spring-boot:run
+```
 
-The exact initial customer segment will be validated through customer interviews and pilot discussions.
+### Option B: Using Any IDE (IntelliJ IDEA / VS Code / Eclipse)
+1. Open the `rfq-to-quote-automation-poc` folder.
+2. Locate `src/main/java/com/santosh/rfq/RfqApplication.java`.
+3. Right-click &rarr; **Run 'RfqApplication'**.
 
 ---
 
-## 4. POC Objective
+## 🔍 Interactive Testing & Tools
 
-The objective of this POC is **not** to build a complete SaaS product.
+Once the server is running on `http://localhost:8080`:
 
-The objective is to prove that the backend can reliably perform:
+### 1. Swagger UI (Interactive API Explorer)
+Open in your browser:
+👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+- View and execute all endpoints directly from your browser.
+- View schemas for request and response payloads.
 
-1. Create an RFQ
-2. Add RFQ items
-3. Maintain a product catalog
-4. Maintain product pricing
-5. Generate a quotation
-6. Calculate quotation totals
-7. Record workflow events
-8. Retrieve RFQ and quotation information
+### 2. H2 Database Console
+Open in your browser:
+👉 **[http://localhost:8080/h2-console](http://localhost:8080/h2-console)**
+- **JDBC URL**: `jdbc:h2:mem:rfqdb`
+- **User Name**: `sa`
+- **Password**: *(leave blank)*
+- Click **Connect** to query the `QUOTE_REQUESTS` table live!
 
 ---
 
-## 5. Core Business Workflow
+## 🧪 Sample cURL Commands
 
-### RFQ Creation
-
-A customer request is represented as an RFQ.
-
-```text
-RFQ
- ├── Customer
- ├── RFQ Number
- ├── Status
- ├── Currency
- ├── Created Date
- └── Items
+### 1. Submit a New Quote (201 Created)
+```bash
+curl -X POST http://localhost:8080/api/v1/quotes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerEmail": "procurement@aerotech.com",
+    "partNumber": "TITANIUM-VALVE-44",
+    "quantity": 250,
+    "targetUnitPrice": 45.00,
+    "notes": "Target delivery within 4 weeks"
+  }'
 ```
 
-### RFQ Items
-
-Each RFQ contains one or more requested products.
-
-```text
-RFQ Item
- ├── Product
- ├── Quantity
- └── Requested Specifications
+### 2. Test Input Validation (400 Bad Request)
+```bash
+curl -X POST http://localhost:8080/api/v1/quotes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerEmail": "not-a-valid-email",
+    "partNumber": "",
+    "quantity": 0
+  }'
 ```
 
-### Product Catalog
-
-The product catalog contains products that can be quoted.
-
-```text
-Product
- ├── SKU
- ├── Name
- ├── Description
- ├── Category
- └── Unit
+### 3. Get Quote by ID (200 OK or 404 Not Found)
+```bash
+curl http://localhost:8080/api/v1/quotes/1
 ```
 
-### Price List
-
-The pricing system stores prices for products.
-
-```text
-Price List
- ├── Product
- ├── Unit Price
- ├── Currency
- ├── Effective From
- └── Effective To
+### 4. Query Quotes by Customer Email
+```bash
+curl "http://localhost:8080/api/v1/quotes?email=procurement@aerotech.com"
 ```
 
-### Quote
-
-A quote is generated from an RFQ using applicable product pricing.
-
-```text
-Quote
- ├── Quote Number
- ├── RFQ
- ├── Status
- ├── Subtotal
- ├── Tax
- ├── Total
- └── Quote Items
+### 5. Update Quote Status
+```bash
+curl -X PATCH "http://localhost:8080/api/v1/quotes/1/status?newStatus=APPROVED"
 ```
 
 ---
 
-## 6. Initial Business Rules
-
-The first version will enforce rules such as:
-
-* An RFQ must contain at least one item.
-* RFQ item quantity must be greater than zero.
-* Every quoted product must exist in the product catalog.
-* A valid price must exist before generating a quote.
-* Quote subtotal is calculated from quantity × unit price.
-* Tax is calculated separately.
-* Quote total = subtotal + applicable tax.
-* Important state changes are recorded as workflow events.
-* Invalid RFQs cannot generate quotations.
-
-These rules will evolve as customer requirements are discovered.
-
----
-
-## 7. Initial Database Model
-
-The initial database will contain:
-
-```text
-customer
-supplier
-rfq
-rfq_item
-product_catalog
-price_list
-price_list_item
-quote
-quote_item
-workflow_event
-```
-
-High-level relationship:
-
-```text
-Customer
-   │
-   └── RFQ
-        │
-        └── RFQ Item
-              │
-              └── Product
-                    │
-                    └── Price List
-
-RFQ
- │
- └── Quote
-      │
-      └── Quote Item
-
-RFQ / Quote
-      │
-      └── Workflow Event
-```
-
----
-
-## 8. Initial API
-
-### Create RFQ
-
-```http
-POST /api/v1/rfqs
-```
-
-### Get RFQ
-
-```http
-GET /api/v1/rfqs/{id}
-```
-
-### Add RFQ Item
-
-```http
-POST /api/v1/rfqs/{id}/items
-```
-
-### Generate Quote
-
-```http
-POST /api/v1/rfqs/{id}/generate-quote
-```
-
-### Get Quote
-
-```http
-GET /api/v1/quotes/{id}
-```
-
----
-
-## 9. Example Workflow
-
-Example RFQ:
-
-```text
-Customer:
-ABC Manufacturing
-
-Requested Products:
-
-1. Industrial Sensor
-   Quantity: 100
-
-2. Control Module
-   Quantity: 20
-
-3. Power Supply
-   Quantity: 50
-```
-
-The system should:
-
-```text
-Create RFQ
-    ↓
-Add RFQ Items
-    ↓
-Find Products
-    ↓
-Find Applicable Prices
-    ↓
-Calculate Item Prices
-    ↓
-Generate Quote
-    ↓
-Calculate Subtotal
-    ↓
-Calculate Tax
-    ↓
-Calculate Total
-    ↓
-Store Workflow Event
-```
-
----
-
-## 10. Technology Stack
-
-### Backend
-
-* Java 17
-* Spring Boot
-* Spring Web
-* Spring Data JPA
-* Bean Validation
-
-### Database
-
-* PostgreSQL
-* Flyway
-
-### Development
-
-* Git
-* GitHub
-* Maven
-* Docker (later)
-
-### Future
-
-* AI/LLM integration
-* n8n / Activepieces
-* Redis
-* Kafka
-* Object Storage
-* Authentication & Authorization
-* ERP integrations
-* Email integration
-* Observability
-
----
-
-## 11. Architecture
-
-Initial architecture:
-
-```text
-                REST API
-                   │
-                   ▼
-              Controller
-                   │
-                   ▼
-               Service
-                   │
-                   ▼
-              Repository
-                   │
-                   ▼
-              PostgreSQL
-```
-
-Business logic should remain in the service/domain layer rather than inside controllers.
-
-Future architecture:
-
-```text
-                    ┌───────────────┐
-Email / PDF / Excel │ AI Extraction │
-        ───────────►│ & Processing  │
-                    └───────┬───────┘
-                            │
-                            ▼
-                      RFQ Platform
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-        Product Match   Pricing Engine   Workflow
-              │             │             │
-              └─────────────┼─────────────┘
-                            ▼
-                       Quote Engine
-                            │
-                   ┌────────┴────────┐
-                   ▼                 ▼
-                 Email              ERP/API
-```
-
----
-
-## 12. Development Roadmap
-
-### Phase 1 — Backend Foundation
-
-* [ ] Spring Boot project
-* [ ] PostgreSQL connection
-* [ ] Flyway migrations
-* [ ] Domain entities
-* [ ] DTOs
-* [ ] RFQ APIs
-* [ ] Product catalog
-* [ ] Price lists
-* [ ] Quote generation
-* [ ] Workflow events
-* [ ] Unit/integration tests
-
-### Phase 2 — Real Business Workflow
-
-* [ ] Customer management
-* [ ] Supplier management
-* [ ] Advanced pricing rules
-* [ ] Discounts
-* [ ] Tax rules
-* [ ] Approval workflow
-* [ ] Quote versioning
-* [ ] Audit trail
-
-### Phase 3 — Automation
-
-* [ ] Email integration
-* [ ] PDF/Excel RFQ ingestion
-* [ ] Workflow automation
-* [ ] Notifications
-* [ ] Automated quote delivery
-
-### Phase 4 — AI
-
-* [ ] RFQ document extraction
-* [ ] Product matching
-* [ ] Specification matching
-* [ ] Pricing assistance
-* [ ] Quote generation assistance
-* [ ] Human approval for uncertain results
-
-### Phase 5 — Production SaaS
-
-* [ ] Authentication
-* [ ] Multi-tenancy
-* [ ] Role-based access
-* [ ] Billing
-* [ ] Monitoring
-* [ ] Security
-* [ ] Deployment
-* [ ] Customer onboarding
-
----
-
-## 13. What This POC Is NOT
-
-The initial POC will intentionally exclude:
-
-* Frontend
-* AI
-* n8n/Activepieces
-* Production deployment
-* Complex authentication
-* Multi-tenancy
-* Advanced analytics
-
-The goal is to first establish a reliable backend business workflow.
-
----
-
-## 14. Success Criteria
-
-The POC will be considered successful when a complete RFQ can be processed without manually calculating the quotation.
-
-Example:
-
-```text
-Create RFQ
-    ↓
-Add Products
-    ↓
-Select Applicable Prices
-    ↓
-Generate Quote
-    ↓
-Calculate:
-    Subtotal
-    Tax
-    Total
-    ↓
-Store Quote
-    ↓
-Record Workflow Events
-```
-
-The entire flow should be demonstrable through Swagger/Postman.
-
----
-
-## 15. Business Validation
-
-Technical development alone does not validate the business.
-
-After the core POC works, the next objective is to validate:
-
-* Who experiences this problem?
-* How frequently does it occur?
-* How much manual work does it create?
-* What errors occur today?
-* What existing tools are being used?
-* What would a customer pay to reduce this work?
-* Which industry has the strongest need?
-* Which workflow should become the initial product?
-
-The product direction will be refined based on customer feedback rather than assumptions.
-
----
-
-## 16. Long-Term Vision
-
-The long-term goal is to build an intelligent B2B quote automation platform that can transform unstructured customer RFQs into accurate, reviewable, and actionable quotations.
-
-```text
-Unstructured RFQ
-      ↓
-Understand
-      ↓
-Structure
-      ↓
-Match
-      ↓
-Price
-      ↓
-Validate
-      ↓
-Approve
-      ↓
-Quote
-      ↓
-Learn
-```
-
-The system should keep humans in control of important pricing and commercial decisions while automating repetitive operational work.
-
----
-
-## 17. Current Status
-
-**Status:** POC — Backend Foundation
-
-**Current Focus:**
-
-> Build the RFQ → Pricing → Quote workflow before adding AI or automation.
+## 🎓 The Zero-to-Advanced Learning Curriculum
+
+| Level | Topic | Key Skills & Annotations |
+| :--- | :--- | :--- |
+| **0. Foundations** | Java 17 & Core Spring | `record`, `Optional`, IoC, DI, Bean Lifecycle, `@Component`, `@Configuration` |
+| **1. REST API** | Web & Validation | `@RestController`, `@GetMapping`, `@PostMapping`, `@Valid`, `@NotBlank`, HTTP codes |
+| **2. Persistence** | Spring Data JPA | `@Entity`, `@Table`, `JpaRepository`, Derived Queries, JPQL, `@Transactional` |
+| **3. Architecture** | Production Patterns | `@RestControllerAdvice`, MapStruct, `@ConfigurationProperties`, Spring Profiles |
+| **4. Security** | Auth & Permissions | Spring Security 6, `SecurityFilterChain`, JWT filter, `@PreAuthorize` (RBAC) |
+| **5. Advanced** | Cloud & Performance | Redis `@Cacheable`, `@Async`, Spring Events, Actuator metrics, Docker & Testcontainers |
